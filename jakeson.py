@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import sys
 
 SCHEMA_VER = "https://json-schema.org/draft/2020-12/schema"
 
@@ -35,4 +36,9 @@ def main():
     return schema
 
 if __name__ == "__main__":
-    print(json.dumps(main(), indent=4, sort_keys=True))
+    if len(sys.argv) != 2:
+        print("Usage: python3.8 jakeson.py <output file>")
+        exit(1)
+
+    with open(sys.argv[1], "w") as out:
+        out.write(json.dumps(main(), indent=4, sort_keys=True))
