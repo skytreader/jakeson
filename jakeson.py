@@ -12,16 +12,33 @@ def is_blank(s):
             return False
     return True
 
-def readquired(schema_field, check=is_blank):
+def readquired(schema_field, check=is_blank, error_message="Can't be blank"):
     """
     check is a function that, as long as true, would prompt the user for input.
     """
     required = input(f"{schema_field}: ")
 
     while check(required):
+        print(f"Ooops, validation failed ({error_message}). Let's try again...")
         required = input(f"{schema_field}: ")
 
     return required
+
+def read_choices(schema_field, choices, is_required=True):
+    _choices = [f"{idx + 1}:{val}" for idx, val in enumerate(choices)]
+    if not is_required:
+        _choices.append("0:SKIP (field not required)")
+    choice_str = " ".join(_choices)
+    choice_prompt = f"{schema_field} [{choice_str}]): "
+    chosen = int(input(choice_prompt))
+
+    while is_required and (chosen < 1 or chosen > len(choices)):
+        chosen = int(input(choice_prompt))
+
+    if not is_required and chosen < 1:
+        return None
+    else:
+        return choices[chosen - 1]
 
 def is_truthy(c):
     if len(c) > 1:
@@ -32,12 +49,18 @@ def is_truthy(c):
 
 def main():
     schema = {}
+    TYPES = ("null", "boolean", "object", "array", "number", "string")
 
+    # These are side-effectful wrappers so we don't have to keep catching the
+    # returned value into `schema`.
     def read(schema_field):
         schema[schema_field] = input(f"{schema_field}: ")
 
-    def readpeatedly(schema_field):
-        schema[schema_field] = readquired(schema_field)
+    def readpeatedly(schema_field, check=is_blank):
+        schema[schema_field] = readquired(schema_field, check)
+
+    def _read_choices(schema_field, choices, is_required=True):
+        schema[schema_field] = read_choices(schema_field, choices, is_required)
 
     print("First things first...")
     _schema = input(f"$schema ({SCHEMA_VER}): ")
@@ -46,7 +69,7 @@ def main():
     readpeatedly("$id")
     read("title")
     read("description")
-    readpeatedly("type")
+    _read_choices("type", TYPES)
 
     if schema["type"] == "object":
         print("Let's get to the meat of things (Ctrl-C to stop)...")
@@ -57,7 +80,7 @@ def main():
             try:
                 propname = readquired("property name")
                 description = readquired("description")
-                _type = readquired("type")
+                _type = read_choices("type", TYPES)
                 is_required = readquired("is required (Y/n)", lambda x: len(x) and x.lower() not in "ytnf")
                 if is_truthy(is_required):
                     schema["required"].append(propname)
