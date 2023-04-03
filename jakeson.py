@@ -4,6 +4,7 @@ import json
 import sys
 
 SCHEMA_VER = "https://json-schema.org/draft/2020-12/schema"
+TYPES = ("null", "boolean", "object", "array", "number", "integer", "string")
 
 def is_blank(s):
     if len(s):
@@ -11,6 +12,13 @@ def is_blank(s):
         if len(unspaced):
             return False
     return True
+
+def is_truthy(c):
+    if len(c) > 1:
+        raise ValueError(f"was expecting a single-char input, received {c}")
+
+    norm = c.lower()
+    return norm in "yt"
 
 def readquired(schema_field, check=is_blank, error_message="Can't be blank"):
     """
@@ -40,16 +48,49 @@ def read_choices(schema_field, choices, is_required=True):
     else:
         return choices[chosen - 1]
 
-def is_truthy(c):
-    if len(c) > 1:
-        raise ValueError(f"was expecting a single-char input, received {c}")
+def read_bool(prompt):
+    return is_truthy(
+        readquired(prompt, lambda x: len(x) and x.lower() not in "ytnf")
+    )
 
-    norm = c.lower()
-    return norm in "yt"
+def read_object_properties(obj_path):
+    properties = {}
+    pendingq = [obj_path]
+
+    while True:
+        try:
+            parentpath = obj_path if not pendingq else pendingq.pop(0)
+            print(f"Define properties for {parentpath}")
+            if len(properties.keys()):
+                print(f"existing properties: {','.join(properties.keys())}")
+            propkey = readquired(f"{parentpath}.properties")
+            description = input(f"{parentpath}->{propkey}.description")
+            is_required = read_bool(f"is {parentpath}->{propkey} required (Y/n)")
+            _type = read_choices(f"{parentpath}->{propkey}.type", TYPES)
+            if _type == "object":
+                pendingq.append(f"{parentpath}->{propkey}")
+
+            properties[propkey] = {
+                "description": description,
+                "is_required": is_required,
+                "type": _type
+            }
+
+            print("------")
+        except KeyboardInterrupt:
+            if pendingq:
+                print(f"Some properties are left undefined: {pendingq}")
+                should_abort = read_bool("really abort (Y/n)?")
+
+                if not should_abort:
+                    continue
+            else:
+                break
+
+    return properties
 
 def main():
     schema = {}
-    TYPES = ("null", "boolean", "object", "array", "number", "string")
 
     # These are side-effectful wrappers so we don't have to keep catching the
     # returned value into `schema`.
@@ -74,7 +115,7 @@ def main():
     if schema["type"] == "object":
         print("Let's get to the meat of things (Ctrl-C to stop)...")
         schema["required"] = []
-        schema["properties"] = {}
+        schema["properties"] = read_object_properties(schema["title"])
 
         while True:
             try:
