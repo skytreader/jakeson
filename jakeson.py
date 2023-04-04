@@ -3,6 +3,8 @@
 import json
 import sys
 
+from utils import SchemaDict
+
 SCHEMA_VER = "https://json-schema.org/draft/2020-12/schema"
 TYPES = ("null", "boolean", "object", "array", "number", "integer", "string")
 
@@ -54,38 +56,46 @@ def read_bool(prompt):
     )
 
 def read_object_properties(obj_path):
-    properties = {}
     pendingq = [obj_path]
+    object_schema = SchemaDict()
 
-    while True:
-        try:
-            parentpath = obj_path if not pendingq else pendingq.pop(0)
-            print(f"Define properties for {parentpath}")
-            if len(properties.keys()):
-                print(f"existing properties: {','.join(properties.keys())}")
-            propkey = readquired(f"{parentpath}.properties")
-            description = input(f"{parentpath}->{propkey}.description")
-            is_required = read_bool(f"is {parentpath}->{propkey} required (Y/n)")
-            _type = read_choices(f"{parentpath}->{propkey}.type", TYPES)
-            if _type == "object":
-                pendingq.append(f"{parentpath}->{propkey}")
+    def read_properties(parentpath):
+        properties = SchemaDict()
+        while True:
+            try:
+                print(f"Define properties for {parentpath}")
+                if len(properties.keys()):
+                    print(f"existing properties: {','.join(properties.keys())}")
+                propkey = readquired(f"{parentpath}.properties")
+                description = input(f"{parentpath}->{propkey}.description:")
+                is_required = read_bool(f"is {parentpath}->{propkey} required (Y/n)")
+                _type = read_choices(f"{parentpath}->{propkey}.type", TYPES)
+                if _type == "object":
+                    print(f"{parentpath} object property noted. Ctrl + C to start defining them now.")
+                    pendingq.append(f"{parentpath}->{propkey}")
 
-            properties[propkey] = {
-                "description": description,
-                "is_required": is_required,
-                "type": _type
-            }
+                properties[propkey] = {
+                    "description": description,
+                    "is_required": is_required,
+                    "type": _type
+                }
 
-            print("------")
-        except KeyboardInterrupt:
-            if pendingq:
-                print(f"Some properties are left undefined: {pendingq}")
-                should_abort = read_bool("really abort (Y/n)?")
+                print("------")
+            except KeyboardInterrupt:
+                if pendingq:
+                    print(f"Some properties are left undefined: {pendingq}")
+                    should_abort = read_bool("really abort (Y/n)?")
 
-                if not should_abort:
-                    continue
-            else:
-                break
+                    if not should_abort:
+                        continue
+                else:
+                    break
+        object_schema
+
+    read_properties(obj_path)
+
+    for propfield in pendingq:
+        read_properties(propfield)
 
     return properties
 
