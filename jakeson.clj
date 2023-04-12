@@ -19,3 +19,19 @@
 
 (defn readquired [schema_field]
   (read_validated schema_field blank?))
+
+(defn generate_choices_prompt [choices, is_required]
+  (let [choice-strings (map-indexed #(str (+ %1 1) ":" %2) choices)]
+    (if is_required
+        (clojure.string/join " " choice-strings)
+        (clojure.string/join " " (cons "0:SKIP" choice-strings)))))
+
+; Returns the index of the choice picked, or -1 if not required and none was chosen
+(defn read_choices [schema_field, choices, is_required]
+  (print (clojure.string/join [schema_field (generate_choices_prompt choices is_required)]))
+  (if is_required
+      (Integer/parseInt (read_validated schema_field
+                                        #(contains? choices (Integer/parseInt %))))
+      (Integer/parseInt (read_validated schema_field
+                                        #(or (contains? choices (Integer/parseInt %))
+                                             (= -1 (Integer/parseInt %)))))))
