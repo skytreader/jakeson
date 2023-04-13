@@ -2,23 +2,24 @@
 (def TYPES ["null", "boolean", "object", "array", "number", "integer", "string"])
 (def TRUTHY #{"y" "t"})
 
-(defn blank? [s] (= (.length (.strip s)) 0))
+(defn not-blank? [s] (> (.length (.strip s)) 0))
 
 (defn truthy? [c] 
   (if (> (.length c) 1)
       (throw (RuntimeException. (str "was expecting single-char input, received " c)))
       (contains? TRUTHY (.toLowerCase c))))
 
-(defn read_validated [schema_field check?]
-  (print schema_field " (required): ")
+(defn read_validated [prompt check?]
+  (print prompt)
   (flush)
   (let [input (read-line)]
-    (if (check? input)
-        (recur schema_field, check?)
-        input)))
+    (if (try (check? input)
+             (catch Exception e false))
+        input
+        (recur prompt check?))))
 
 (defn readquired [schema_field]
-  (read_validated schema_field blank?))
+  (read_validated (str schema_field " (required):") not-blank?))
 
 (defn generate_choices_prompt [choices, is_required]
   (let [choice-strings (map-indexed #(str (+ %1 1) ":" %2) choices)]
@@ -28,10 +29,10 @@
 
 ; Returns the index of the choice picked, or -1 if not required and none was chosen
 (defn read_choices [schema_field, choices, is_required]
-  (print (clojure.string/join [schema_field (generate_choices_prompt choices is_required)]))
-  (if is_required
-      (Integer/parseInt (read_validated schema_field
-                                        #(contains? choices (Integer/parseInt %))))
-      (Integer/parseInt (read_validated schema_field
-                                        #(or (contains? choices (Integer/parseInt %))
-                                             (= -1 (Integer/parseInt %)))))))
+  (let [prompt (clojure.string/join " " [schema_field (generate_choices_prompt choices is_required)])]
+    (if is_required
+        (Integer/parseInt (read_validated prompt
+                                          #(contains? choices (- (Integer/parseInt %) 1))))
+        (Integer/parseInt (read_validated prompt
+                                          #(or (contains? choices (- (Integer/parseInt %) 1))
+                                               (= -1 (Integer/parseInt %))))))))
