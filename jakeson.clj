@@ -21,18 +21,16 @@
       (throw (RuntimeException. (str "was expecting single-char input, received " c)))
       (contains? FALSEY (.toLowerCase c))))
 
-(defn read-w-prompt [prompt]
-  (print prompt ": ")
-  (flush)
-  (read-line))
-
-(defn read-w-prompt [prompt default]
-  (print prompt "(" default "): ")
-  (flush)
-  (read-line))
+(defn read-w-prompt
+  ([prompt] (print prompt ": ")
+            (flush)
+            (read-line))
+  ([prompt default] (print prompt "(" default "): ")
+                    (flush)
+                    (read-line)))
 
 (defn read_validated [prompt check?]
-  (print prompt)
+  (print prompt ": ")
   (flush)
   (let [input (read-line)]
     (if (try (check? input)
@@ -41,7 +39,7 @@
         (recur prompt check?))))
 
 (defn readquired [schema_field]
-  (read_validated (str schema_field " (required):") not-blank?))
+  (read_validated (str schema_field " (required)") not-blank?))
 
 (defn generate_choices_prompt [choices is_required]
   (let [choice-strings (map-indexed #(str (+ %1 1) ":" %2) choices)]
@@ -49,15 +47,21 @@
         (join " " choice-strings)
         (join " " (cons "0:SKIP" choice-strings)))))
 
-; Returns the index of the choice picked, or -1 if not required and none was chosen
-(defn read-choices [schema_field choices is_required]
+; Returns the numeric value entered by the user as prompted by `generate_choices_prompt`
+(defn read-choices-index [schema_field choices is_required]
   (let [prompt (clojure.string/join " " [schema_field (generate_choices_prompt choices is_required)])]
     (if is_required
         (Integer/parseInt (read_validated prompt
                                           #(contains? choices (- (Integer/parseInt %) 1))))
         (Integer/parseInt (read_validated prompt
                                           #(or (contains? choices (- (Integer/parseInt %) 1))
-                                               (= -1 (Integer/parseInt %))))))))
+                                               (= 0 (Integer/parseInt %))))))))
+
+(defn read-choices [schema-field choices required?]
+  (let [choice-index (read-choices-index schema-field choices required?)]
+    (if (= choice-index 0)
+        nil
+        (get choices (- choice-index 1)))))
 
 (defn generate-defaulted-boolean-choices [default-val]
   (cond
@@ -86,28 +90,25 @@
       (read-fn)))
 
 (declare read-sub-objs)
-(defn read-object-properties [obj-path running-props required-props pending-sub-objs]
-  (println "Define properties for " obj-path)
-  (println "Existing properties: " (keys running-props))
-  (let [propkey (readquired "property key")
-        description (propkey-check propkey #((read-w-prompt "description")))
-        required? (propkey-check propkey #((read-bool "required" false)))
-        _type (propkey-check propkey #((read-choices "type" TYPES true)))]
-    (cond
-      (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) running-props
-      (= propkey "jakeson.STOP") (read-sub-objs pending-sub-objs)
-      (= _type "object") (recur obj-path
-                                (assoc running-props propkey {"type" "object"})
-                                (if required? (cons propkey required-props) required-props)
-                                (cons propkey pending-sub-objs))
-      :else (recur obj-path
-                   (assoc running-props propkey "type" _type)
-                   (if required? (cons propkey required-props) required-props)
-                   pending-sub-objs))))
-
-; driver method
-(defn read-object-properties [obj-path]
-  (read-object-properties obj-path {} [] []))
+(defn read-object-properties 
+  ([obj-path running-props required-props pending-sub-objs] (println "Define properties for" obj-path)
+                                                            (println "Existing properties:" (keys running-props))
+                                                            (let [propkey (readquired "property key")
+                                                                  description (propkey-check propkey #(read-w-prompt "description"))
+                                                                  required? (propkey-check propkey #(read-bool "required" false))
+                                                                  _type (propkey-check propkey #(read-choices "type" TYPES true))]
+                                                              (cond
+                                                                (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) running-props
+                                                                (= propkey "jakeson.STOP") (read-sub-objs pending-sub-objs)
+                                                                (= _type "object") (recur obj-path
+                                                                                          (assoc running-props propkey {"type" "object"})
+                                                                                          (if required? (cons propkey required-props) required-props)
+                                                                                          (cons propkey pending-sub-objs))
+                                                                :else (recur obj-path
+                                                                             (assoc running-props propkey "type" _type)
+                                                                             (if required? (cons propkey required-props) required-props)
+                                                                             pending-sub-objs))))
+  ([obj-path] (read-object-properties obj-path {} [] [])))
 
 (defn read-sub-objs [parent-obj-path other-props pending-sub-objs]
   (if (empty? (rest pending-sub-objs))
@@ -133,3 +134,5 @@
           "description" description
           "type" _type
         })))
+
+(top-level-driver)
