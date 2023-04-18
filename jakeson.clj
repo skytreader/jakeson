@@ -65,24 +65,23 @@
 
 (defn generate-defaulted-boolean-choices [default-val]
   (cond
+    (and (boolean? default-val) default-val) "Y/n"
+    (and (boolean? default-val) (not default-val)) "y/N"
     (truthy? default-val) "Y/n"
     (falsey? default-val) "y/N"
     :else (throw (RuntimeException. (str "provided default not a boolean value: " default-val)))))
 
 ; Use this for required boolean fields
-(defn read-bool [schema-field]
-  (truthy? (read_validated (str schema-field " y/n:") bool?)))
-
-; Use this for non-required boolean fields
-(defn read-bool [schema-field default-val]
-  (let [truth-read (read_validated (join " "
-                                         [schema-field
-                                         (str (generate-defaulted-boolean-choices default-val)
-                                              ":")])
-                                   #(or (bool? %) (not (not-blank? %))))]
-    (if (bool? truth-read)
-        (truthy? truth-read)
-        (truthy? default-val))))
+(defn read-bool
+  ([schema-field] (truthy? (read_validated (str schema-field " y/n:") bool?)))
+  ([schema-field default-val] (let [truth-read (read_validated (join " "
+                                                                     [schema-field
+                                                                     (str (generate-defaulted-boolean-choices default-val)
+                                                                          ":")])
+                                                               #(or (bool? %) (not (not-blank? %))))]
+                                    (if (bool? truth-read)
+                                        (truthy? truth-read)
+                                        (truthy? default-val)))))
 
 (defn propkey-check [propkey read-fn]
   (if (= propkey "jakeson.STOP")
@@ -99,13 +98,13 @@
                                                                   _type (propkey-check propkey #(read-choices "type" TYPES true))]
                                                               (cond
                                                                 (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) running-props
-                                                                (= propkey "jakeson.STOP") (read-sub-objs pending-sub-objs)
+                                                                (= propkey "jakeson.STOP") (read-sub-objs obj-path running-props pending-sub-objs)
                                                                 (= _type "object") (recur obj-path
                                                                                           (assoc running-props propkey {"type" "object"})
                                                                                           (if required? (cons propkey required-props) required-props)
                                                                                           (cons propkey pending-sub-objs))
                                                                 :else (recur obj-path
-                                                                             (assoc running-props propkey "type" _type)
+                                                                             (assoc running-props propkey {"type" _type "description" description})
                                                                              (if required? (cons propkey required-props) required-props)
                                                                              pending-sub-objs))))
   ([obj-path] (read-object-properties obj-path {} [] [])))
