@@ -93,9 +93,10 @@
   ([obj-path running-props required-props pending-sub-objs] (println "Define properties for" obj-path)
                                                             (println "Existing properties:" (keys running-props))
                                                             (let [propkey (readquired "property key")
-                                                                  description (propkey-check propkey #(read-w-prompt "description"))
-                                                                  required? (propkey-check propkey #(read-bool "required" false))
-                                                                  _type (propkey-check propkey #(read-choices "type" TYPES true))]
+                                                                  prompt-prefix (join "." [obj-path propkey])
+                                                                  description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"])))
+                                                                  required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false))
+                                                                  _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
                                                               (cond
                                                                 (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) running-props
                                                                 (= propkey "jakeson.STOP") (read-sub-objs obj-path running-props pending-sub-objs)
@@ -112,10 +113,10 @@
 (defn read-sub-objs [parent-obj-path other-props pending-sub-objs]
   (if (empty? (rest pending-sub-objs))
       (assoc other-props (first pending-sub-objs)
-             (read-object-properties (join "." parent-obj-path (first pending-sub-objs)) [] []))
+             (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])))
       (recur parent-obj-path
              (assoc other-props (first pending-sub-objs)
-                    (read-object-properties (join "." parent-obj-path (first pending-sub-objs)) [] []))
+                    (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])))
              (rest pending-sub-objs))))
 
 (defn top-level-driver []
