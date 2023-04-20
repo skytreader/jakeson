@@ -1,4 +1,6 @@
-(use '[clojure.string :only (join)])
+(ns net.skytreader.jakeson "Jakeson - Your friendly JSON Schema Generator"
+  (:use [clojure.string :only (join)])
+  (:require [clojure.data.json :as json]))
 
 (def SCHEMA_VER "https://json-schema.org/draft/2020-12/schema")
 (def TYPES ["null", "boolean", "object", "array", "number", "integer", "string"])
@@ -27,7 +29,10 @@
             (read-line))
   ([prompt default] (print prompt "(" default "): ")
                     (flush)
-                    (read-line)))
+                    (let [input (read-line)]
+                      (if (not-blank? input)
+                          input
+                          default))))
 
 (defn read_validated [prompt check?]
   (print prompt ": ")
@@ -135,4 +140,4 @@
           "type" _type
         })))
 
-(top-level-driver)
+(print (json/write-str (top-level-driver)))
