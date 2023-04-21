@@ -1,2 +1,2 @@
 (load-file "./jakeson.clj")
-(read_choices "test" ["a" "b" "c"] true)
+(println (net.skytreader.jakeson/read-object-properties "Product"))

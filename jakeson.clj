@@ -103,8 +103,8 @@
                                                                   required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false))
                                                                   _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
                                                               (cond
-                                                                (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) running-props
-                                                                (= propkey "jakeson.STOP") (read-sub-objs obj-path running-props pending-sub-objs)
+                                                                (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) {"properties" running-props "required" required-props}
+                                                                (= propkey "jakeson.STOP") {"properties" (merge running-props (read-sub-objs obj-path running-props pending-sub-objs)) "required" required-props}
                                                                 (= _type "object") (recur obj-path
                                                                                           (assoc running-props propkey {"type" "object"})
                                                                                           (if required? (cons propkey required-props) required-props)
@@ -130,14 +130,13 @@
         title (readquired "title")
         description (read-w-prompt "description")
         _type (read-choices "type" TYPES true)]
-    (if (= _type "object")
-        (read-object-properties title)
-        {
-          "$schema" schema
-          "$id" id
-          "title" title
-          "description" description
-          "type" _type
-        })))
+    (merge {"$schema" schema
+            "$id" id
+            "title" title
+            "description" description
+            "type" _type}
+          (if (= _type "object")
+              (read-object-properties title)
+              {}))))
 
 (print (json/write-str (top-level-driver)))
