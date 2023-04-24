@@ -1,6 +1,6 @@
 (ns net.skytreader.jakeson "Jakeson - Your friendly JSON Schema Generator"
   (:use [clojure.string :only (join)])
-  (:require [clojure.data.json :as json]))
+  (:use [cheshire.core :only (generate-string)]))
 
 (def SCHEMA_VER "https://json-schema.org/draft/2020-12/schema")
 (def TYPES ["null", "boolean", "object", "array", "number", "integer", "string"])
@@ -76,9 +76,9 @@
     (falsey? default-val) "y/N"
     :else (throw (RuntimeException. (str "provided default not a boolean value: " default-val)))))
 
-; Use this for required boolean fields
 (defn read-bool
   ([schema-field] (truthy? (read_validated (str schema-field " y/n:") bool?)))
+  ; Use this for required boolean fields
   ([schema-field default-val] (let [truth-read (read_validated (join " "
                                                                      [schema-field
                                                                      (str (generate-defaulted-boolean-choices default-val)
@@ -95,24 +95,25 @@
 
 (declare read-sub-objs)
 (defn read-object-properties 
-  ([obj-path running-props required-props pending-sub-objs] (println "Define properties for" obj-path)
-                                                            (println "Existing properties:" (keys running-props))
-                                                            (let [propkey (readquired "property key")
-                                                                  prompt-prefix (join "." [obj-path propkey])
-                                                                  description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"])))
-                                                                  required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false))
-                                                                  _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
-                                                              (cond
-                                                                (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) {"properties" running-props "required" required-props}
-                                                                (= propkey "jakeson.STOP") {"properties" (merge running-props (read-sub-objs obj-path running-props pending-sub-objs)) "required" required-props}
-                                                                (= _type "object") (recur obj-path
-                                                                                          (assoc running-props propkey {"type" "object"})
-                                                                                          (if required? (cons propkey required-props) required-props)
-                                                                                          (cons propkey pending-sub-objs))
-                                                                :else (recur obj-path
-                                                                             (assoc running-props propkey {"type" _type "description" description})
-                                                                             (if required? (cons propkey required-props) required-props)
-                                                                             pending-sub-objs))))
+  ([obj-path running-props required-props pending-sub-objs]
+   (println "Define properties for" obj-path)
+   (println "Existing properties:" (keys running-props))
+   (let [propkey (readquired "property key")
+         prompt-prefix (join "." [obj-path propkey])
+         description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"])))
+         required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false))
+         _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
+     (cond
+       (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) {"properties" running-props "required" required-props}
+       (= propkey "jakeson.STOP") {"properties" (merge running-props (read-sub-objs obj-path running-props pending-sub-objs)) "required" required-props}
+       (= _type "object") (recur obj-path
+                                 (assoc running-props propkey {"type" "object"})
+                                 (if required? (cons propkey required-props) required-props)
+                                 (cons propkey pending-sub-objs))
+       :else (recur obj-path
+                    (assoc running-props propkey {"type" _type "description" description})
+                    (if required? (cons propkey required-props) required-props)
+                    pending-sub-objs))))
   ([obj-path] (read-object-properties obj-path {} [] [])))
 
 (defn read-sub-objs [parent-obj-path other-props pending-sub-objs]
@@ -139,4 +140,4 @@
               (read-object-properties title)
               {}))))
 
-(print (json/write-str (top-level-driver)))
+(print (generate-string (top-level-driver) {:pretty true}))
