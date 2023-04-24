@@ -140,4 +140,4 @@
               (read-object-properties title)
               {}))))
 
-(print (generate-string (top-level-driver) {:pretty true}))
+(spit (first *command-line-args*) (generate-string (top-level-driver) {:pretty true}))
