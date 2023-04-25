@@ -1,4 +1,4 @@
-(ns net.skytreader.jakeson "Jakeson - Your friendly JSON Schema Generator"
+(ns net.skytreader.jakeson.main "Jakeson - Your friendly JSON Schema Generator"
   (:use [clojure.string :only (join)])
   (:use [cheshire.core :only (generate-string)]))
 
