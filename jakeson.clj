@@ -3,7 +3,7 @@
   (:use [cheshire.core :only (generate-string)]))
 
 (def SCHEMA_VER "https://json-schema.org/draft/2020-12/schema")
-(def TYPES ["null", "boolean", "object", "array", "number", "integer", "string"])
+(def TYPES ["null", "boolean", "object", "array", "number", "integer", "string", "reference"])
 (def TRUTHY #{"y" "t"})
 (def FALSEY #{"n" "f"})
 
@@ -95,7 +95,7 @@
 
 (declare read-sub-objs)
 (defn read-object-properties 
-  ([obj-path running-props required-props pending-sub-objs]
+  ([obj-path running-props required-props pending-sub-objs existing-schemas]
    (println "Define properties for" obj-path)
    (println "Existing properties:" (keys running-props))
    (let [propkey (readquired "property key")
@@ -105,27 +105,34 @@
          _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
      (cond
        (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) {"properties" running-props "required" required-props}
-       (= propkey "jakeson.STOP") {"properties" (merge running-props (read-sub-objs obj-path running-props pending-sub-objs)) "required" required-props}
+       (= propkey "jakeson.STOP") {"properties" (merge running-props
+                                                       (read-sub-objs obj-path running-props pending-sub-objs existing-schemas))
+                                   "required" required-props}
        (= _type "object") (recur obj-path
                                  (assoc running-props propkey {"type" "object"})
                                  (if required? (cons propkey required-props) required-props)
-                                 (cons propkey pending-sub-objs))
+                                 (cons propkey pending-sub-objs)
+                                 existing-schemas)
        :else (recur obj-path
                     (assoc running-props propkey {"type" _type "description" description})
                     (if required? (cons propkey required-props) required-props)
-                    pending-sub-objs))))
-  ([obj-path] (read-object-properties obj-path {} [] [])))
+                    pending-sub-objs
+                    existing-schemas))))
+  ([obj-path existing-schemas] (read-object-properties obj-path {} [] [] existing-schemas)))
 
-(defn read-sub-objs [parent-obj-path other-props pending-sub-objs]
+(defn read-sub-objs [parent-obj-path other-props pending-sub-objs existing-schemas]
   (if (empty? (rest pending-sub-objs))
       (assoc other-props (first pending-sub-objs)
-             (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])))
+             (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])
+                                     existing-schemas))
       (recur parent-obj-path
              (assoc other-props (first pending-sub-objs)
-                    (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])))
-             (rest pending-sub-objs))))
+                    (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])
+                                            existing-schemas))
+             (rest pending-sub-objs)
+             existing-schemas)))
 
-(defn top-level-driver []
+(defn top-level-driver [existing-schemas]
   (let [schema (read-w-prompt "schema" SCHEMA_VER)
         id (readquired "id")
         title (readquired "title")
@@ -137,7 +144,11 @@
             "description" description
             "type" _type}
           (if (= _type "object")
-              (read-object-properties title)
+              (read-object-properties title existing-schemas)
               {}))))
 
-(spit (first *command-line-args*) (generate-string (top-level-driver) {:pretty true}))
+(spit (first *command-line-args*)
+      (generate-string (top-level-driver (if (nil? (second *command-line-args*))
+                                              {}
+                                              (second *command-line-args*)))
+                       {:pretty true}))
