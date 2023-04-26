@@ -1,0 +1,5 @@
+
+https://github.com/skytreader/praytraxing/Scene.schema.json
+Scene
+
+8

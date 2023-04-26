@@ -1,4 +1,4 @@
-(ns net.skytreader.jakeson.schema-refs ""
+(ns net.skytreader.jakeson ""
   (:use [cheshire.core :only (parse-stream)]))
 
 ; Given a JSON Schema file, return the `title` and `id` of the schema.

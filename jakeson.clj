@@ -1,4 +1,4 @@
-(ns net.skytreader.jakeson.main "Jakeson - Your friendly JSON Schema Generator"
+(ns net.skytreader.jakeson "Jakeson - Your friendly JSON Schema Generator"
   (:use [clojure.string :only (join)])
   (:use [cheshire.core :only (generate-string)]))
 
@@ -14,14 +14,16 @@
       (contains? FALSEY (.toLowerCase c))))
 
 (defn truthy? [c] 
-  (if (> (.length c) 1)
-      (throw (RuntimeException. (str "was expecting single-char input, received " c)))
-      (contains? TRUTHY (.toLowerCase c))))
+  (cond
+    (boolean? c) c
+    (> (.length c) 1) (throw (RuntimeException. (str "was expecting single-char input, received " c)))
+    :else (contains? TRUTHY (.toLowerCase c))))
 
 (defn falsey? [c] 
-  (if (> (.length c) 1)
-      (throw (RuntimeException. (str "was expecting single-char input, received " c)))
-      (contains? FALSEY (.toLowerCase c))))
+  (cond
+    (boolean? c) c
+    (> (.length c) 1) (throw (RuntimeException. (str "was expecting single-char input, received " c)))
+    :else (contains? FALSEY (.toLowerCase c))))
 
 (defn read-w-prompt
   ([prompt] (print prompt ": ")
@@ -88,6 +90,11 @@
                                         (truthy? truth-read)
                                         (truthy? default-val)))))
 
+(defn read-ref [obj-path existing-schemas]
+  (let [choices (vec (keys existing-schemas))
+        input (read-choices (str "Type reference for " obj-path "\n") choices true)]
+    (get existing-schemas input)))
+
 (defn propkey-check [propkey read-fn]
   (if (= propkey "jakeson.STOP")
       nil
@@ -109,10 +116,17 @@
                                                        (read-sub-objs obj-path running-props pending-sub-objs existing-schemas))
                                    "required" required-props}
        (= _type "object") (recur obj-path
-                                 (assoc running-props propkey {"type" "object"})
+                                 (assoc running-props propkey {"type" "object" "description" description})
                                  (if required? (cons propkey required-props) required-props)
                                  (cons propkey pending-sub-objs)
                                  existing-schemas)
+       (= _type "reference") (recur obj-path
+                                    (assoc running-props propkey {"description" description
+                                                                  "$ref" (read-ref obj-path existing-schemas)})
+                                    (if required? (cons propkey required-props) required-props)
+                                    pending-sub-objs
+                                    existing-schemas)
+
        :else (recur obj-path
                     (assoc running-props propkey {"type" _type "description" description})
                     (if required? (cons propkey required-props) required-props)
@@ -137,7 +151,7 @@
         id (readquired "id")
         title (readquired "title")
         description (read-w-prompt "description")
-        _type (read-choices "type" TYPES true)]
+        _type (read-choices "type" (vec (filter #(not (= % "reference")) TYPES)) true)]
     (merge {"$schema" schema
             "$id" id
             "title" title
@@ -147,8 +161,9 @@
               (read-object-properties title existing-schemas)
               {}))))
 
+(load-file "./schema-refs.clj")
 (spit (first *command-line-args*)
       (generate-string (top-level-driver (if (nil? (second *command-line-args*))
                                               {}
-                                              (second *command-line-args*)))
+                                              (discover-ids (second *command-line-args*))))
                        {:pretty true}))
