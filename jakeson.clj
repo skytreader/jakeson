@@ -48,16 +48,16 @@
 (defn readquired [schema_field]
   (read_validated (str schema_field " (required)") not-blank?))
 
-(defn generate_choices_prompt [choices is_required]
+(defn generate-choices-prompt [choices is_required]
   (let [choice-strings (map-indexed #(str (+ %1 1) ":" %2) choices)]
-    (if is_required
+    (if (and is_required (> (count choices) 0))
         (join " " choice-strings)
         (join " " (cons "0:SKIP" choice-strings)))))
 
-; Returns the numeric value entered by the user as prompted by `generate_choices_prompt`
+; Returns the numeric value entered by the user as prompted by `generate-choices-prompt`
 (defn read-choices-index [schema_field choices is_required]
-  (let [prompt (clojure.string/join " " [schema_field (generate_choices_prompt choices is_required)])]
-    (if is_required
+  (let [prompt (clojure.string/join " " [schema_field (generate-choices-prompt choices is_required)])]
+    (if (and is_required (> (count choices) 0))
         (Integer/parseInt (read_validated prompt
                                           #(contains? choices (- (Integer/parseInt %) 1))))
         (Integer/parseInt (read_validated prompt
@@ -83,8 +83,7 @@
   ; Use this for required boolean fields
   ([schema-field default-val] (let [truth-read (read_validated (join " "
                                                                      [schema-field
-                                                                     (str (generate-defaulted-boolean-choices default-val)
-                                                                          ":")])
+                                                                      (generate-defaulted-boolean-choices default-val)])
                                                                #(or (bool? %) (not (not-blank? %))))]
                                     (if (bool? truth-read)
                                         (truthy? truth-read)
@@ -109,6 +108,7 @@
          prompt-prefix (join "." [obj-path propkey])
          description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"])))
          required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false))
+         ; TODO _type can be an array of basic types
          _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
      (cond
        (and (= propkey "jakeson.STOP") (empty? pending-sub-objs)) {"properties" running-props "required" required-props}
