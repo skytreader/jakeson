@@ -122,7 +122,8 @@
                                  existing-schemas)
        (= _type "reference") (recur obj-path
                                     (assoc running-props propkey {"description" description
-                                                                  "$ref" (read-ref obj-path existing-schemas)})
+                                                                  "$ref" (read-ref obj-path
+                                                                                   (assoc existing-schemas (str obj-path "[self-reference]") "#"))})
                                     (if required? (cons propkey required-props) required-props)
                                     pending-sub-objs
                                     existing-schemas)

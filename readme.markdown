@@ -15,5 +15,7 @@ still need to fill in other details afterwards.
 2. Invoke as `clojure jakeson.clj output.json`.
 3. If you have a bunch of pre-existing schemas that you want to reference, put
 them under one directory and invoke as `clojure jakeson.clj output.json existing-schemas`.
+4. To stop enumerating properties, enter `jakeson.STOP` for the `property key: `
+prompt.
 
 The initial run will install the required dependency.
