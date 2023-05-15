@@ -10,6 +10,8 @@
 dist/
 build/
 *.mypy_cache/*
+.cpcache
+out/
 
 bin/
 include/

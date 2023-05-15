@@ -1,0 +1,23 @@
+
+https://github.com/skytreader/praytracing/Sphere.schema.json
+Sphere
+A spherical object to be rendered in our scene.
+3
+radius
+
+y
+5
+material
+Surface material of the sphere. Defines reflective properties.
+
+7
+name
+Label of this object for debugging.
+
+7
+center
+
+y
+8
+1
+jakeson.STOP
