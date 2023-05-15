@@ -3,7 +3,8 @@
   (:use [cheshire.core :only (generate-string)]))
 
 (def SCHEMA_VER "https://json-schema.org/draft/2020-12/schema")
-(def TYPES ["null", "boolean", "object", "array", "number", "integer", "string", "reference"])
+(def TYPES ["null", "boolean", "object", "array", "number", "integer", "string", "reference", "multi"])
+(def MULTITYPE_QUANTIFIERS ["allOf", "anyOf", "oneOf", "not"])
 (def TRUTHY #{"y" "t"})
 (def FALSEY #{"n" "f"})
 
@@ -48,13 +49,17 @@
 (defn readquired [schema_field]
   (read_validated (str schema_field " (required)") not-blank?))
 
+; Constructs a 1-indexed prompt listing the choices a user can have. If the
+; prompt is not required, we add an additional "0:SKIP" option.
 (defn generate-choices-prompt [choices is_required]
   (let [choice-strings (map-indexed #(str (+ %1 1) ":" %2) choices)]
     (if (and is_required (> (count choices) 0))
         (join " " choice-strings)
         (join " " (cons "0:SKIP" choice-strings)))))
 
-; Returns the numeric value entered by the user as prompted by `generate-choices-prompt`
+; Returns the numeric value entered by the user as prompted by
+; `generate-choices-prompt`---hence it will be 1-indexed. The 0 option is
+; reserved for skipping a non-required prompt.
 (defn read-choices-index [schema_field choices is_required]
   (let [prompt (clojure.string/join " " [schema_field (generate-choices-prompt choices is_required)])]
     (if (and is_required (> (count choices) 0))
@@ -64,6 +69,9 @@
                                           #(or (contains? choices (- (Integer/parseInt %) 1))
                                                (= 0 (Integer/parseInt %))))))))
 
+; Returns the string value/actual choice that a user chooses from a multiple-
+; choice prompt. If the prompt is not required and the user chooses to skip it,
+; nil is returned.
 (defn read-choices [schema-field choices required?]
   (let [choice-index (read-choices-index schema-field choices required?)]
     (if (= choice-index 0)
@@ -94,6 +102,27 @@
         input (read-choices (str "Type reference for " obj-path "\n") choices true)]
     (get existing-schemas input)))
 
+(declare read-object-properties)
+(defn read-multitype [obj-path quantifier types existing-schemas]
+  (let [_type (read-choices "type" (vec (filter #(not (= % "multi")) TYPES)) false)]
+    (cond
+      (nil? _type) {quantifier (cons _type types)}
+      (= _type "object") (recur obj-path
+                                quantifier
+                                (cons (read-object-properties (join "." [obj-path quantifier]))
+                                      types)
+                                existing-schemas)
+      (= _type "reference") (recur obj-path
+                                   quantifier
+                                   (cons {"$ref" (read-ref (join "." [obj-path quantifier])
+                                                           existing-schemas)}
+                                         types)
+                                   existing-schemas)
+      :else (recur obj-path
+                   quantifier
+                   (cons _type types)
+                   existing-schemas))))
+
 (defn propkey-check [propkey read-fn]
   (if (= propkey "jakeson.STOP")
       nil
@@ -108,6 +137,7 @@
          prompt-prefix (join "." [obj-path propkey])
          description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"])))
          required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false))
+         next-path-key (join "." [obj-path propkey])
          ; TODO _type can be an array of basic types
          _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
      (cond
@@ -127,6 +157,16 @@
                                     (if required? (cons propkey required-props) required-props)
                                     pending-sub-objs
                                     existing-schemas)
+       (= _type "multi") (recur obj-path
+                                (assoc running-props
+                                       propkey
+                                       (read-multitype next-path-key
+                                                       (read-choices next-path-key MULTITYPE_QUANTIFIERS true)
+                                                       []
+                                                       existing-schemas))
+                                 (if required? (cons propkey required-props) required-props)
+                                 pending-sub-objs
+                                 existing-schemas)
 
        :else (recur obj-path
                     (assoc running-props propkey {"type" _type "description" description})
@@ -152,7 +192,7 @@
         id (readquired "id")
         title (readquired "title")
         description (read-w-prompt "description")
-        _type (read-choices "type" (vec (filter #(not (= % "reference")) TYPES)) true)]
+        _type (read-choices "type" (vec (filter #(not (or (= % "reference") (= % "multi"))) TYPES)) true)]
     (merge {"$schema" schema
             "$id" id
             "title" title
