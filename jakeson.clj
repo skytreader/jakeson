@@ -1,4 +1,5 @@
 (ns net.skytreader.jakeson "Jakeson - Your friendly JSON Schema Generator"
+  (:import (java.net URI))
   (:use [clojure.string :only (join)])
   (:use [cheshire.core :only (generate-string)]))
 
@@ -37,7 +38,7 @@
                           input
                           default))))
 
-(defn read_validated [prompt check?]
+(defn read-validated [prompt check?]
   (print prompt ": ")
   (flush)
   (let [input (read-line)]
@@ -47,7 +48,7 @@
         (recur prompt check?))))
 
 (defn readquired [schema_field]
-  (read_validated (str schema_field " (required)") not-blank?))
+  (read-validated (str schema_field " (required)") not-blank?))
 
 ; Constructs a 1-indexed prompt listing the choices a user can have. If the
 ; prompt is not required, we add an additional "0:SKIP" option.
@@ -63,9 +64,9 @@
 (defn read-choices-index [schema_field choices is_required]
   (let [prompt (clojure.string/join " " [schema_field (generate-choices-prompt choices is_required)])]
     (if (and is_required (> (count choices) 0))
-        (Integer/parseInt (read_validated prompt
+        (Integer/parseInt (read-validated prompt
                                           #(contains? choices (- (Integer/parseInt %) 1))))
-        (Integer/parseInt (read_validated prompt
+        (Integer/parseInt (read-validated prompt
                                           #(or (contains? choices (- (Integer/parseInt %) 1))
                                                (= 0 (Integer/parseInt %))))))))
 
@@ -87,9 +88,9 @@
     :else (throw (RuntimeException. (str "provided default not a boolean value: " default-val)))))
 
 (defn read-bool
-  ([schema-field] (truthy? (read_validated (str schema-field " y/n:") bool?)))
+  ([schema-field] (truthy? (read-validated (str schema-field " y/n:") bool?)))
   ; Use this for required boolean fields
-  ([schema-field default-val] (let [truth-read (read_validated (join " "
+  ([schema-field default-val] (let [truth-read (read-validated (join " "
                                                                      [schema-field
                                                                       (generate-defaulted-boolean-choices default-val)])
                                                                #(or (bool? %) (not (not-blank? %))))]
@@ -189,7 +190,7 @@
 
 (defn top-level-driver [existing-schemas]
   (let [schema (read-w-prompt "schema" SCHEMA_VER)
-        id (readquired "id")
+        id (read-vlaidated "id" URI.)
         title (readquired "title")
         description (read-w-prompt "description")
         _type (read-choices "type" (vec (filter #(not (or (= % "reference") (= % "multi"))) TYPES)) true)]
