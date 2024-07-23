@@ -204,8 +204,12 @@
               {}))))
 
 (load-file "./schema-refs.clj")
-(spit (first *command-line-args*)
-      (generate-string (top-level-driver (if (nil? (second *command-line-args*))
-                                              {}
-                                              (discover-ids (second *command-line-args*))))
-                       {:pretty true}))
+(defn write-schema-file [filename existing-schemas]
+  (spit filename
+        (generate-string (top-level-driver (if (nil? existing-schemas)
+                                               {}
+                                               (discover-ids existing-schemas)))
+                         {:pretty true})))
+
+; TODO It should be easy to automap command-line-args as arguments.
+(write-schema-file (first *command-line-args*) (second *command-line-args*))
