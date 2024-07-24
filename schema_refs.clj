@@ -1,4 +1,4 @@
-(ns net.skytreader.jakeson ""
+(ns schema-refs ""
   (:use [cheshire.core :only (parse-stream)]))
 
 ; "visit"
