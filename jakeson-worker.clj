@@ -6,7 +6,7 @@
   (:use [cheshire.core :only (generate-string)]))
 
 (def SCHEMA_VER "https://json-schema.org/draft/2020-12/schema")
-(def TYPES ["null", "boolean", "object", "array", "number", "integer", "string", "reference", "multi"])
+(def TYPES ["null", "boolean", "object", "array", "number", "integer", "string", "reference", "enum", "multi"])
 (def MULTITYPE_QUANTIFIERS ["allOf", "anyOf", "oneOf", "not"])
 (def TRUTHY #{"y" "t"})
 (def FALSEY #{"n" "f"})
@@ -45,7 +45,8 @@
   (flush)
   (let [input (read-line)]
     (if (try (check? input)
-             (catch Exception e false))
+             true
+             (catch Exception e (print "failed validation: " (.getMessage e)) false))
         input
         (recur prompt check?))))
 
@@ -170,6 +171,13 @@
                                  (if required? (cons propkey required-props) required-props)
                                  pending-sub-objs
                                  existing-schemas)
+       (= _type "enum") (recur obj-path
+                               (assoc running-props
+                                      propkey
+                                      (read-w-prompt (str propkey "enumeration")))
+                               (if required? (cons propkey required-props) required-props)
+                               pending-sub-objs
+                               existing-schemas)
 
        :else (recur obj-path
                     (assoc running-props propkey {"type" _type "description" description})
@@ -192,8 +200,8 @@
 
 (defn top-level-driver [existing-schemas]
   (let [schema (read-w-prompt "schema" SCHEMA_VER)
-        id (read-validated "id" URI)
-        title (readquired "title")
+        id (readquired "id")
+        title (read-validated "title" #(URI. %))
         description (read-w-prompt "description")
         _type (read-choices "type" (vec (filter #(not (or (= % "reference") (= % "multi"))) TYPES)) true)]
     (merge {"$schema" schema
@@ -206,12 +214,9 @@
               {}))))
 
 (defn write-schema-file [filename existing-schemas]
-  (spit filename
-        (generate-string (top-level-driver (if (nil? existing-schemas)
-                                               {}
-                                               (discover-ids existing-schemas)))
-                         {:pretty true})))
-
-; TODO It should be easy to automap command-line-args as arguments.
-(defn -main [& args]
-(write-schema-file (first args) (second args)))
+  (let [schemalib (if (nil? existing-schemas) {} (discover-ids existing-schemas))]
+    (println "Found schemas: " schemalib)
+    (println "Printing to: " filename)
+    (spit filename
+          (generate-string (top-level-driver schemalib)
+                           {:pretty true}))))
