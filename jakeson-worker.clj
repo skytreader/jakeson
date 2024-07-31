@@ -174,7 +174,7 @@
        (= _type "enum") (recur obj-path
                                (assoc running-props
                                       propkey
-                                      (read-w-prompt (str propkey "enumeration")))
+                                      {"enum" (read-w-prompt (str propkey " enumeration (enter array contents)"))})
                                (if required? (cons propkey required-props) required-props)
                                pending-sub-objs
                                existing-schemas)
