@@ -2,7 +2,7 @@
 (ns jakeson-worker "Jakeson - Your friendly JSON Schema Generator"
   (:import (java.net URI))
   (:use [schema-refs :only (discover-ids)])
-  (:use [clojure.string :only (join)])
+  (:use [clojure.string :only (split join)])
   (:use [cheshire.core :only (generate-string)]))
 
 (def SCHEMA_VER "https://json-schema.org/draft/2020-12/schema")
@@ -174,7 +174,7 @@
        (= _type "enum") (recur obj-path
                                (assoc running-props
                                       propkey
-                                      {"enum" (read-w-prompt (str propkey " enumeration (enter array contents)"))})
+                                      {"enum" (split (read-w-prompt (str propkey " enumeration (enter array contents)")) #",\s*")})
                                (if required? (cons propkey required-props) required-props)
                                pending-sub-objs
                                existing-schemas)
