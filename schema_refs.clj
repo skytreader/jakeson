@@ -28,6 +28,7 @@
 (defn discover-ids [directory]
   (reduce (fn [acc title-id-pair] (assoc acc (first title-id-pair) (second title-id-pair)))
           {}
-          (first (map parse-title-ids
-               (filter #(and (.isFile %) (.endsWith (.getName %) ".json"))
-                       (file-seq (clojure.java.io/file directory)))))))
+          (reduce concat 
+                  (map parse-title-ids
+                       (filter #(and (.isFile %) (.endsWith (.getName %) ".json"))
+                               (file-seq (clojure.java.io/file directory)))))))
