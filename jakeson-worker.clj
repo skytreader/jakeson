@@ -43,15 +43,17 @@
   ([prompt] (read-w-prompt prompt "" read-line))
   ([prompt default] (read-w-prompt prompt default read-line)))
 
-(defn read-validated [prompt check?]
-  (print prompt ": ")
-  (flush)
-  (let [input (read-line)]
-    (if (try (check? input)
-             true
-             (catch Exception e (print "failed validation: " (.getMessage e)) false))
-        input
-        (recur prompt check?))))
+(defn read-validated 
+  ([prompt check? input-fn]
+   (print prompt ": ")
+   (flush)
+   (let [input (input-fn)]
+     (if (try (check? input)
+              true
+              (catch Exception e (print "failed validation: " (.getMessage e)) false))
+         input
+         (recur prompt check? input-fn))))
+  ([prompt check?] (read-validated prompt check? read-line)))
 
 (defn readquired [schema_field]
   (read-validated (str schema_field " (required)") not-blank?))

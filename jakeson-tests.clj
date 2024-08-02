@@ -35,5 +35,9 @@
     (t/is (= ""
              (jakeson/read-w-prompt "[TEST] hello" "" #(str ""))))))
 
+(t/deftest read-validated-test
+  (t/testing "valid input"
+    (t/is (= "ok"
+             (jakeson/read-validated "enter 'ok'" (fn [_] true) #(str "ok"))))))
 
 (t/run-tests)
