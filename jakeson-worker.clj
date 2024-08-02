@@ -30,15 +30,18 @@
     :else (contains? FALSEY (.toLowerCase c))))
 
 (defn read-w-prompt
-  ([prompt] (print prompt ": ")
-            (flush)
-            (read-line))
-  ([prompt default] (print prompt "(" default "): ")
-                    (flush)
-                    (let [input (read-line)]
-                      (if (not-blank? input)
-                          input
-                          default))))
+  ([prompt default input-fn]
+   (let [default-guide (if (not-blank? default)
+                         (str "(" default ")")
+                         "")]
+     (print prompt default-guide ": ")
+     (flush)
+     (let [input (input-fn)]
+       (if (not-blank? input)
+           input
+           default))))
+  ([prompt] (read-w-prompt prompt "" read-line))
+  ([prompt default] (read-w-prompt prompt default read-line)))
 
 (defn read-validated [prompt check?]
   (print prompt ": ")
