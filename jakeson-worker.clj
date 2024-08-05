@@ -48,11 +48,12 @@
    (print prompt ": ")
    (flush)
    (let [input (input-fn)]
-     (if (try (check? input)
-              true
+     (if (try (if (check? input)
+                  (do (println "success") true)
+                  false)
               (catch Exception e (print "failed validation: " (.getMessage e)) false))
          input
-         (recur prompt check? input-fn))))
+         (do (println "failed input:" input)(recur prompt check? input-fn)))))
   ([prompt check?] (read-validated prompt check? read-line)))
 
 (defn readquired [schema_field]

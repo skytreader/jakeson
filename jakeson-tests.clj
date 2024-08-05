@@ -38,6 +38,14 @@
 (t/deftest read-validated-test
   (t/testing "valid input"
     (t/is (= "ok"
-             (jakeson/read-validated "enter 'ok'" (fn [_] true) #(str "ok"))))))
+             (jakeson/read-validated "enter 'ok'" (fn [_] true) #(str "ok")))))
+  (t/testing "invalid inputs"
+    (t/is (= "okay"
+             (let [retvals ["ok" "0|<" "okay"]
+                   index (atom -1)]
+               (jakeson/read-validated "enter 'okay'"
+                                       #(= % "okay")
+                                       (fn [] (do (swap! index inc)
+                                                  (get retvals @index)))))))))
 
 (t/run-tests)
