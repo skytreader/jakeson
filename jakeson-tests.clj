@@ -36,16 +36,26 @@
              (jakeson/read-w-prompt "[TEST] hello" "" #(str ""))))))
 
 (t/deftest read-validated-test
-  (t/testing "valid input"
+  (t/testing "valid input returns itself"
     (t/is (= "ok"
              (jakeson/read-validated "enter 'ok'" (fn [_] true) #(str "ok")))))
-  (t/testing "invalid inputs"
+  (t/testing "invalid inputs are repeatedly prompted until a valid input is given"
     (t/is (= "okay"
              (let [retvals ["ok" "0|<" "okay"]
                    index (atom -1)]
                (jakeson/read-validated "enter 'okay'"
                                        #(= % "okay")
                                        (fn [] (do (swap! index inc)
-                                                  (get retvals @index)))))))))
+                                                  (get retvals @index))))))))
+  (t/testing "exceptions from the validator are considered invalid inputs"
+    (t/is (= "okay"
+             (let [should-succeed? [false false true]
+                   index (atom -1)]
+               (jakeson/read-validated "enter 'okay'"
+                                       (fn [foo] (if (= foo "okay")
+                                                   true
+                                                   (throw (RuntimeException. "failed with exception"))))
+                                       (fn [] (do (swap! index inc)
+                                                  (if (get should-succeed? @index) "okay" "ok")))))))))
 
 (t/run-tests)
