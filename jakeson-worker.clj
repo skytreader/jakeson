@@ -70,14 +70,19 @@
 ; Returns the numeric value entered by the user as prompted by
 ; `generate-choices-prompt`---hence it will be 1-indexed. The 0 option is
 ; reserved for skipping a non-required prompt.
-(defn read-choices-index [schema_field choices is_required]
-  (let [prompt (clojure.string/join " " [schema_field (generate-choices-prompt choices is_required)])]
-    (if (and is_required (> (count choices) 0))
-        (Integer/parseInt (read-validated prompt
-                                          #(contains? choices (- (Integer/parseInt %) 1))))
-        (Integer/parseInt (read-validated prompt
-                                          #(or (contains? choices (- (Integer/parseInt %) 1))
-                                               (= 0 (Integer/parseInt %))))))))
+(defn read-choices-index 
+  ([schema_field choices is_required input-fn]
+   (let [prompt (clojure.string/join " " [schema_field (generate-choices-prompt choices is_required)])]
+     (if (and is_required (> (count choices) 0))
+         (Integer/parseInt (read-validated prompt
+                                           #(contains? choices (- (Integer/parseInt %) 1))
+                                           input-fn))
+         (Integer/parseInt (read-validated prompt
+                                           #(or (contains? choices (- (Integer/parseInt %) 1))
+                                                (= 0 (Integer/parseInt %)))
+                                           input-fn)))))
+  ([schema-field choices is-required]
+   (read-choices-index schema-field choices is-required read-line)))
 
 ; Returns the string value/actual choice that a user chooses from a multiple-
 ; choice prompt. If the prompt is not required and the user chooses to skip it,

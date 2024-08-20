@@ -58,4 +58,26 @@
                                        (fn [] (do (swap! index inc)
                                                   (if (get should-succeed? @index) "okay" "ok")))))))))
 
+(t/deftest read-choices-index
+  (t/testing "1-indexed choice is returned"
+    (t/is (= 1
+             (jakeson/read-choices-index "test"
+                                         ["choose me" "not me" "nor me"]
+                                         true
+                                         #(str "1")))))
+  (t/testing "0 is returned for non-required prompts"
+    (t/is (= 0
+             (jakeson/read-choices-index "test"
+                                         ["cats" "seafood" "electric boxing"]
+                                         false
+                                         #(str "0")))))
+  (t/testing "0 can't be chosen for required prompts"
+    (t/is (= 2
+             (let [user-input ["0" "2"]
+                   index (atom -1)]
+               (jakeson/read-choices-index "test"
+                                           ["dogs" "noodles" "boxing"]
+                                           true
+                                           (fn [] (do (swap! index inc)
+                                                      (get user-input @index)))))))))
 (t/run-tests)
