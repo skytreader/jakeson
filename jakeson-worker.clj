@@ -87,11 +87,14 @@
 ; Returns the string value/actual choice that a user chooses from a multiple-
 ; choice prompt. If the prompt is not required and the user chooses to skip it,
 ; nil is returned.
-(defn read-choices [schema-field choices required?]
-  (let [choice-index (read-choices-index schema-field choices required?)]
-    (if (= choice-index 0)
-        nil
-        (get choices (- choice-index 1)))))
+(defn read-choices 
+  ([schema-field choices required? input-fn]
+   (let [choice-index (read-choices-index schema-field choices required? input-fn)]
+     (if (= choice-index 0)
+         nil
+         (get choices (- choice-index 1)))))
+  ([schema-field choices required?]
+   (read-choices schema-field choices required? read-line)))
 
 (defn generate-defaulted-boolean-choices [default-val]
   (cond

@@ -79,5 +79,46 @@
                                            ["dogs" "noodles" "boxing"]
                                            true
                                            (fn [] (do (swap! index inc)
+                                                      (get user-input @index))))))))
+  (t/testing "out-of-bounds choices are caught"
+    (t/is (= 1
+             (let [user-input ["3" "1"]
+                   index (atom -1)]
+               (jakeson/read-choices-index "test"
+                                           ["spam" "eggs"]
+                                           true
+                                           (fn [] (do (swap! index inc)
                                                       (get user-input @index)))))))))
+
+(t/deftest read-choices
+  (t/testing "1-indexed choice is returned"
+    (t/is (= "choose me"
+             (jakeson/read-choices "test"
+                                   ["choose me" "not me" "nor me"]
+                                   true
+                                   #(str "1")))))
+  (t/testing "nil is returned if prompt is not required and user skips it"
+    (t/is (nil? (jakeson/read-choices "test"
+                                      ["cats" "seafood" "electric boxing"]
+                                      false
+                                      #(str "0")))))
+  (t/testing "0 can't be chosen for required prompts"
+    (t/is (= "noodles"
+             (let [user-input ["0" "2"]
+                   index (atom -1)]
+               (jakeson/read-choices "test"
+                                     ["dogs" "noodles" "boxing"]
+                                     true
+                                     (fn [] (do (swap! index inc)
+                                                (get user-input @index))))))))
+  (t/testing "out-of-bounds choices are caught"
+    (t/is (= "spam"
+             (let [user-input ["3" "1"]
+                   index (atom -1)]
+               (jakeson/read-choices "test"
+                                     ["spam" "eggs"]
+                                     true
+                                     (fn [] (do (swap! index inc)
+                                                (get user-input @index)))))))))
+
 (t/run-tests)
