@@ -1,0 +1,31 @@
+
+https://example.com/product.schema.json
+Product
+A product from ACME's catalog
+3
+productId
+The unique identifier for a product
+y
+6
+dimensions
+Physical size of the product
+y
+3
+price
+The cost of the product
+y
+5
+jakeson.STOP
+length
+
+y
+5
+width
+
+y
+5
+height
+
+y
+5
+jakeson.STOP
