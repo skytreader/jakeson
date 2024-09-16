@@ -105,41 +105,47 @@
     :else (throw (RuntimeException. (str "provided default not a boolean value: " default-val)))))
 
 (defn read-bool
-  ([schema-field] (truthy? (read-validated (str schema-field " y/n:") bool?)))
-  ; Use this for required boolean fields
-  ([schema-field default-val] (let [truth-read (read-validated (join " "
+  ([schema-field default-val input-fn] (let [truth-read (read-validated (join " "
                                                                      [schema-field
                                                                       (generate-defaulted-boolean-choices default-val)])
-                                                               #(or (bool? %) (not (not-blank? %))))]
+                                                               #(or (bool? %) (not (not-blank? %))) input-fn)]
                                     (if (bool? truth-read)
                                         (truthy? truth-read)
-                                        (truthy? default-val)))))
+                                        (truthy? default-val))))
+  ([schema-field default-val] (read-bool schema-field default-val read-line)))
 
-(defn read-ref [obj-path existing-schemas]
-  (let [choices (vec (keys existing-schemas))
-        input (read-choices (str "Type reference for " obj-path "\n") choices true)]
-    (get existing-schemas input)))
+(defn read-ref
+  ([obj-path existing-schemas input-fn]
+   (let [choices (vec (keys existing-schemas))
+         input (read-choices (str "Type reference for " obj-path "\n") choices true)]
+     (get existing-schemas input)))
+   ([obj-path existing-schemas] (read-ref obj-path existing-schemas read-line)))
 
 (declare read-object-properties)
-(defn read-multitype [obj-path quantifier types existing-schemas]
-  (let [_type (read-choices "type" (vec (filter #(not (= % "multi")) TYPES)) false)]
-    (cond
-      (nil? _type) {quantifier (cons _type types)}
-      (= _type "object") (recur obj-path
-                                quantifier
-                                (cons (read-object-properties (join "." [obj-path quantifier]))
-                                      types)
-                                existing-schemas)
-      (= _type "reference") (recur obj-path
-                                   quantifier
-                                   (cons {"$ref" (read-ref (join "." [obj-path quantifier])
-                                                           existing-schemas)}
-                                         types)
-                                   existing-schemas)
-      :else (recur obj-path
-                   quantifier
-                   (cons _type types)
-                   existing-schemas))))
+(defn read-multitype
+  ([obj-path quantifier types existing-schemas input-fn]
+   (let [_type (read-choices "type" (vec (filter #(not (= % "multi")) TYPES)) false input-fn)]
+     (cond
+       (nil? _type) {quantifier types}
+       (= _type "object") (recur obj-path
+                                 quantifier
+                                 (cons (read-object-properties (join "." [obj-path quantifier]))
+                                       types input-fn)
+                                 existing-schemas
+                                 input-fn)
+       (= _type "reference") (recur obj-path
+                                    quantifier
+                                    (cons {"$ref" (read-ref (join "." [obj-path quantifier])
+                                                            existing-schemas input-fn)}
+                                          types)
+                                    existing-schemas
+                                    input-fn)
+       :else (recur obj-path
+                    quantifier
+                    (cons _type types)
+                    existing-schemas
+                    input-fn))))
+  ([obj-path quantifier types existing-schemas] (read-multitype obj-path quantifier types existing-schemas read-line)))
 
 (defn propkey-check [propkey read-fn]
   (if (= propkey "jakeson.STOP")
@@ -148,13 +154,13 @@
 
 (declare read-sub-objs)
 (defn read-object-properties 
-  ([obj-path running-props required-props pending-sub-objs existing-schemas]
+  ([obj-path running-props required-props pending-sub-objs existing-schemas input-fn]
    (println "Define properties for" obj-path)
    (println "Existing properties:" (keys running-props))
    (let [propkey (readquired "property key")
          prompt-prefix (join "." [obj-path propkey])
-         description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"])))
-         required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false))
+         description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"]) input-fn))
+         required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false input-fn))
          next-path-key (join "." [obj-path propkey])
          ; TODO _type can be an array of basic types
          _type (propkey-check propkey #(read-choices (join "." [prompt-prefix "type"]) TYPES true))]
@@ -167,14 +173,16 @@
                                  (assoc running-props propkey {"type" "object" "description" description})
                                  (if required? (cons propkey required-props) required-props)
                                  (cons propkey pending-sub-objs)
-                                 existing-schemas)
+                                 existing-schemas
+                                 input-fn)
        (= _type "reference") (recur obj-path
                                     (assoc running-props propkey {"description" description
                                                                   "$ref" (read-ref obj-path
                                                                                    (assoc existing-schemas (str obj-path "[self-reference]") "#"))})
                                     (if required? (cons propkey required-props) required-props)
                                     pending-sub-objs
-                                    existing-schemas)
+                                    existing-schemas
+                                    input-fn)
        (= _type "multi") (recur obj-path
                                 (assoc running-props
                                        propkey
@@ -184,33 +192,40 @@
                                                        existing-schemas))
                                  (if required? (cons propkey required-props) required-props)
                                  pending-sub-objs
-                                 existing-schemas)
+                                 existing-schemas
+                                 input-fn)
        (= _type "enum") (recur obj-path
                                (assoc running-props
                                       propkey
                                       {"enum" (split (read-w-prompt (str propkey " enumeration (enter array contents)")) #",\s*")})
                                (if required? (cons propkey required-props) required-props)
                                pending-sub-objs
-                               existing-schemas)
+                               existing-schemas
+                               input-fn)
 
        :else (recur obj-path
                     (assoc running-props propkey {"type" _type "description" description})
                     (if required? (cons propkey required-props) required-props)
                     pending-sub-objs
-                    existing-schemas))))
-  ([obj-path existing-schemas] (read-object-properties obj-path {} [] [] existing-schemas)))
+                    existing-schemas
+                    input-fn))))
+  ([obj-path existing-schemas] (read-object-properties obj-path {} [] [] existing-schemas read-line)))
 
-(defn read-sub-objs [parent-obj-path other-props pending-sub-objs existing-schemas]
-  (if (empty? (rest pending-sub-objs))
-      (assoc other-props (first pending-sub-objs)
-             (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])
-                                     existing-schemas))
-      (recur parent-obj-path
-             (assoc other-props (first pending-sub-objs)
-                    (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])
-                                            existing-schemas))
-             (rest pending-sub-objs)
-             existing-schemas)))
+(defn read-sub-objs 
+  ([parent-obj-path other-props pending-sub-objs existing-schemas input-fn]
+   (if (empty? (rest pending-sub-objs))
+       (assoc other-props (first pending-sub-objs)
+              (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])
+                                      existing-schemas))
+       (recur parent-obj-path
+              (assoc other-props (first pending-sub-objs)
+                     (read-object-properties (join "." [parent-obj-path (first pending-sub-objs)])
+                                             existing-schemas))
+              (rest pending-sub-objs)
+              existing-schemas
+              input-fn)))
+  ([parent-obj-path other-props pending-sub-objs existing-schemas]
+   (read-sub-objs parent-obj-path other-props pending-sub-objs existing-schemas read-line)))
 
 (defn top-level-driver [existing-schemas]
   (let [schema (read-w-prompt "schema" SCHEMA_VER)

@@ -121,4 +121,18 @@
                                      (fn [] (do (swap! index inc)
                                                 (get user-input @index)))))))))
 
+(t/deftest read-multitype
+  (t/is (= {"oneOf" (list "string" "integer")}
+           (let [VALID-TYPES (filter #(not (= % "multi")) jakeson/TYPES)
+                 user-input [(str (inc (.indexOf VALID-TYPES "integer")))
+                             (str (inc (.indexOf VALID-TYPES "string")))
+                             "0"]
+                 index (atom -1)]
+             (jakeson/read-multitype "test"
+                                     "oneOf"
+                                     []
+                                     {}
+                                     (fn [] (do (swap! index inc)
+                                                (get user-input @index))))))))
+
 (t/run-tests)
