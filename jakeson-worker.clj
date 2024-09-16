@@ -11,7 +11,7 @@
 (def TRUTHY #{"y" "t"})
 (def FALSEY #{"n" "f"})
 
-(defn not-blank? [s] (> (.length (.strip s)) 0))
+(defn not-blank? [s] (do (println "asked for not blank" (str s)) (> (.length (.strip s)) 0)))
 
 (defn bool? [c]
   (or (contains? TRUTHY (.toLowerCase c))
@@ -48,16 +48,15 @@
    (print prompt ": ")
    (flush)
    (let [input (input-fn)]
-     (if (try (if (check? input)
-                  (do (println "success") true)
-                  false)
+     (if (try (if (do (println "Checking input" (check? input)) (check? input)) true false)
               (catch Exception e (print "failed validation: " (.getMessage e)) false))
-         input
-         (do (println "failed input:" input)(recur prompt check? input-fn)))))
+         (do (println "Returning" (str input)) input)
+         (do (println "failed input:" input) (recur prompt check? input-fn)))))
   ([prompt check?] (read-validated prompt check? read-line)))
 
-(defn readquired [schema_field]
-  (read-validated (str schema_field " (required)") not-blank?))
+(defn readquired 
+  ([schema_field input-fn] (read-validated (str schema_field " (required)") not-blank? input-fn))
+  ([schema_field] (readquired schema_field read-line)))
 
 ; Constructs a 1-indexed prompt listing the choices a user can have. If the
 ; prompt is not required, we add an additional "0:SKIP" option.
@@ -157,9 +156,9 @@
   ([obj-path running-props required-props pending-sub-objs existing-schemas input-fn]
    (println "Define properties for" obj-path)
    (println "Existing properties:" (keys running-props))
-   (let [propkey (readquired "property key")
+   (let [propkey (readquired "property key" input-fn)
          prompt-prefix (join "." [obj-path propkey])
-         description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"]) input-fn))
+         description (propkey-check propkey #(read-w-prompt (join "." [prompt-prefix "description"]) "" input-fn))
          required? (propkey-check propkey #(read-bool (join "." [prompt-prefix "required"]) false input-fn))
          next-path-key (join "." [obj-path propkey])
          ; TODO _type can be an array of basic types
