@@ -11,7 +11,7 @@
 (def TRUTHY #{"y" "t"})
 (def FALSEY #{"n" "f"})
 
-(defn not-blank? [s] (do (println "asked for not blank" (str s)) (> (.length (.strip s)) 0)))
+(defn not-blank? [s] (> (.length (.strip s)) 0))
 
 (defn bool? [c]
   (or (contains? TRUTHY (.toLowerCase c))
@@ -48,9 +48,9 @@
    (print prompt ": ")
    (flush)
    (let [input (input-fn)]
-     (if (try (if (do (println "Checking input" (check? input)) (check? input)) true false)
+     (if (try (check? input)
               (catch Exception e (print "failed validation: " (.getMessage e)) false))
-         (do (println "Returning" (str input)) input)
+         input
          (do (println "failed input:" input) (recur prompt check? input-fn)))))
   ([prompt check?] (read-validated prompt check? read-line)))
 
